@@ -16,11 +16,6 @@
         <label for="data">Excel file</label>
         <input type="file" accept=".xlsx, .xls" name="sheet" id="data">
         <br><br>
-        <!--
-        <label for="template">Template</label>
-        <input type="file" accept=".docx" name="template" id="template">
-        <br><br>
-        -->
         <input type="number" name="row" id="row" placeholder="Row number" min="1">
         <br><br>
         <button type="button" onclick="fillForm()" id="genbutton" hidden>Generate DOCX</button>
@@ -51,7 +46,6 @@
 
     const resetFileInput = () => {
         dataInput.value = "";
-        templateInput.value = "";
         genButton.setAttribute('hidden', true);
         workbook = null;
         docxTemplateBuffer = null;
@@ -85,17 +79,6 @@
             tryRemoveHidden();
         });
     });
-
-    /*
-    templateInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        file.arrayBuffer().then(buffer => {
-            docxTemplateBuffer = buffer;
-            templateInputLoaded = true;
-            tryRemoveHidden();
-        });
-    });
-    */
 
     const fillForm = async () => {
         if (!workbook || !docxTemplateBuffer) {
