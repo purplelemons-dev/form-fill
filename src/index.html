@@ -1,9 +1,4 @@
 <!DOCTYPE html>
-<!--
-    Created by: [@thepurplelemons](https://github.com/purplelemons-dev)
-    For: Collin College Police Department
-    License: GNU General Public License v3.0
--->
 <html lang="en">
 
 <head>
@@ -11,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report Generator</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.25.1/docxtemplater.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
-    <script src="https://raw.githubusercontent.com/eligrey/FileSaver.js/master/dist/FileSaver.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/pizzip@3.1.7/dist/pizzip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/xlsx"></script>
 </head>
 
 <body>
@@ -24,70 +19,77 @@
         <label for="template">Template</label>
         <input type="file" accept=".docx" name="template" id="template">
         <br><br>
+        <button type="button" onclick="fillForm()" hidden id="genbutton">Generate DOCX</button>
     </form>
+    <!-- At bottom of page-->
+    <div style="position: fixed; bottom: 0; width: 100%; text-align: center;">
+        <p>Created by Josh Smith (A.K.A. <a href="https://github.com/purplelemons-dev">PurpleLemons</a>)</p>
+    </div>
 </body>
 <script>
-    const data = document.getElementById('data');
-    const template = document.getElementById('template');
-    let [dataLoaded, tempLoaded] = [false, false];
-    let workbook, docxTemplate;
+    const dataInput = document.getElementById('data');
+    const templateInput = document.getElementById('template');
+    const genButton = document.getElementById('genbutton');
+    let workbook, docxTemplateBuffer;
+    let [dataInputLoaded, templateInputLoaded] = [false, false];
 
-    data.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        const arrayBuffer = await file.arrayBuffer();
-        workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        dataLoaded = true;
-        if (tempLoaded) {
-            await fillForm();
+    const tryRemoveHidden = () => {
+        if (dataInputLoaded && templateInputLoaded) {
+            genButton.removeAttribute('hidden');
         }
+    }
+
+    dataInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        file.arrayBuffer().then(buffer => {
+            workbook = XLSX.read(buffer, { type: 'array' });
+        });
+        dataInputLoaded = true;
+        tryRemoveHidden();
     });
 
-    template.addEventListener('change', async (e) => {
+    templateInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        const arrayBuffer = await file.arrayBuffer();
-        docxTemplate = arrayBuffer;
-        tempLoaded = true;
-        if (dataLoaded) {
-            await fillForm();
-        }
+        file.arrayBuffer().then(buffer => {
+            docxTemplateBuffer = buffer;
+        });
+        templateInputLoaded = true;
+        tryRemoveHidden();
     });
 
     const fillForm = async () => {
-        if (!workbook || !docxTemplate) {
-            console.error("XLSX or DOCX is not loaded. what the hell did you do Czawlytko?");
+        if (!workbook || !docxTemplateBuffer) {
+            console.error("XLSX or DOCX is not loaded. what the hell did you do, Czawlytko?");
             return;
         }
 
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const sheetData = XLSX.utils.sheet_to_json(sheet);
+        const zip = new PizZip(docxTemplateBuffer);
         let rowCounter = 1;
 
-        for (const rowData of sheetData) {
-            // Create a new JSZip instance
-            const zip = new JSZip();
-            // Load your DOCX template content into the zip instance
-            await zip.loadAsync(docxTemplate)
-                .then(function (zip) {
-                    const doc = new window.docxtemplater().loadZip(zip);
-                    doc.setData(rowData);
-                    doc.render();
+        sheetData.forEach(data => {
+            let totalTaught = 0;
+            Object.keys(data).forEach(key => {
+                if (key.startsWith("Num of Attendees")) {
+                    totalTaught += Number(data[key]);
+                }
+            });
+            console.log(data);
 
-                    const out = doc.getZip().generate({
-                        type: "blob",
-                        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    });
+            const doc = new window.docxtemplater().loadZip(zip);
+            doc.setData({ ...data, "Total Taught": totalTaught });
+            doc.render();
 
-                    const downloader = document.createElement('button');
-                    downloader.innerText = `Download Row ${rowCounter}`;
-                    downloader.addEventListener('click', () => saveAs(out, `Report_${rowCounter++}.docx`));
-                    document.body.appendChild(downloader);
-                })
-                .catch(function (e) {
-                    console.error(e.message, e.stack);
-                });
-        }
-    };
+            const out = doc.getZip().generate({
+                type: "blob",
+                mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            });
 
+            saveAs(out, `Report_${data["Event Name"]}_${rowCounter++}.docx`);
+        });
+        window.location.reload();
+    }
 </script>
 
 </html>
