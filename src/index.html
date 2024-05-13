@@ -19,6 +19,8 @@
         <label for="template">Template</label>
         <input type="file" accept=".docx" name="template" id="template">
         <br><br>
+        <input type="number" name="row" id="row" placeholder="Row number" min="1">
+        <br><br>
         <button type="button" onclick="fillForm()" id="genbutton" hidden>Generate DOCX</button>
     </form>
     <div style="position: fixed; bottom: 0; width: 100%; text-align: center;">
@@ -29,6 +31,7 @@
     const dataInput = document.getElementById('data');
     const templateInput = document.getElementById('template');
     const genButton = document.getElementById('genbutton');
+    const rowNumber = document.getElementById('row');
     let workbook, docxTemplateBuffer;
     let [dataInputLoaded, templateInputLoaded] = [false, false];
 
@@ -45,6 +48,7 @@
         workbook = null;
         docxTemplateBuffer = null;
         [dataInputLoaded, templateInputLoaded] = [false, false];
+        rowNumber.value = "1";
     }
 
     const properMonth = (date) => {
@@ -62,7 +66,7 @@
             "10": "October",
             "11": "November",
             "12": "December",
-        }[month] + " " + year;
+        }[month] + " 20" + year; // NOTE: this wont work for next century lmfao
     }
 
     dataInput.addEventListener('change', (e) => {
@@ -92,46 +96,45 @@
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const sheetData = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: "mm-dd-yyyy" });
         const zip = new PizZip(docxTemplateBuffer);
-        let rowCounter = 1;
 
-        sheetData.forEach(data => {
-            console.log(data);
-            let totalTaught = 0;
-            Object.keys(data).forEach(key => {
-                if (key.startsWith("Num of Attendees")) {
-                    totalTaught += Number(data[key]);
-                }
-            });
+        const data = sheetData[Number(rowNumber.value) - 1];
 
-            let rows = [];
-
-            Object.keys(data).forEach(key => {
-                if (key.startsWith("Num of ") || key.startsWith("Staff Assisted") || key.startsWith("Date") || key.startsWith("Location") || key.startsWith("Description")) {
-                    const [indexStr, ..._] = key.split(" ").reverse();
-                    const index = Number(indexStr) - 1;
-                    if (rows[index] === undefined) {
-                        rows[index] = {};
-                    }
-                    if (data[key] != "undefined") {
-                        const newKey = key.split(" ").slice(0, -1).join(" ");
-                        rows[index][newKey] = data[key];
-                    }
-                }
-            });
-
-            const doc = new window.docxtemplater().loadZip(zip);
-            doc.setData({
-                ...data, "Total Taught": totalTaught, "Proper Month": properMonth(data["Date of Report"]), rows
-            });
-            doc.render();
-
-            const out = doc.getZip().generate({
-                type: "blob",
-                mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            });
-
-            saveAs(out, `Report_${data["Event Name"]}_${rowCounter++}.docx`);
+        console.log(data);
+        let totalTaught = 0;
+        Object.keys(data).forEach(key => {
+            if (key.startsWith("Num of Attendees")) {
+                totalTaught += Number(data[key]);
+            }
         });
+
+        let rows = [];
+
+        Object.keys(data).forEach(key => {
+            if (key.startsWith("Num of ") || key.startsWith("Staff Assisted") || key.startsWith("Date") || key.startsWith("Location") || key.startsWith("Description")) {
+                const [indexStr, ..._] = key.split(" ").reverse();
+                const index = Number(indexStr) - 1;
+                if (rows[index] === undefined) {
+                    rows[index] = {};
+                }
+                if (data[key] != "undefined") {
+                    const newKey = key.split(" ").slice(0, -1).join(" ");
+                    rows[index][newKey] = data[key];
+                }
+            }
+        });
+
+        const doc = new window.docxtemplater().loadZip(zip);
+        doc.setData({
+            ...data, "Total Taught": totalTaught, "Proper Month": properMonth(data["Date of Report"]), rows
+        });
+        doc.render();
+
+        const out = doc.getZip().generate({
+            type: "blob",
+            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        });
+
+        saveAs(out, `Report_${data["Event Name"]}.docx`);
         resetFileInput();
     }
 </script>
