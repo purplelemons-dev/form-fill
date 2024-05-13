@@ -10,8 +10,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report Generator</title>
-    <script src="https://unpkg.com/docxtemplater"></script>
-    <script src="https://unpkg.com/xlsx"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.25.1/docxtemplater.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://raw.githubusercontent.com/eligrey/FileSaver.js/master/dist/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -28,53 +30,64 @@
     const data = document.getElementById('data');
     const template = document.getElementById('template');
     let [dataLoaded, tempLoaded] = [false, false];
+    let workbook, docxTemplate;
+
     data.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        const arrayBuffer = await file.arrayBuffer();
+        workbook = XLSX.read(arrayBuffer, { type: 'array' });
         dataLoaded = true;
         if (tempLoaded) {
-            await fillForm(data, template);
+            await fillForm();
         }
     });
+
     template.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        const arrayBuffer = await file.arrayBuffer();
+        docxTemplate = arrayBuffer;
         tempLoaded = true;
         if (dataLoaded) {
-            await fillForm(data, template);
+            await fillForm();
         }
     });
 
-    /**
-     * @param {HTMLInputElement} data
-     * @param {HTMLInputElement} template
-     */
-    const fillForm = async (data, template) => {
-        console.log(`Data: ${data.files[0].name}\nTemplate: ${template.files[0].name}`);
-        const reportName = data.files[0].name.split('.')[0];
-
-        const workbook = await XLSX.readFile(await data.files[0].arrayBuffer(), { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const sheetData = XLSX.utils.sheet_to_json(sheet);
-        console.log(sheetData);
-        let rowCounter = 1;
-
-        for (const row of sheetData) {
-            console.log(row);
-
-
-
-            const downloader = document.createElement('button');
-            downloader.innerText = `Download Row ${rowCounter}`;
-            downloader.addEventListener('click', async () => {
-
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${reportName}_${rowCounter++}.pdf`;
-                a.click();
-            });
-            document.body.appendChild(downloader);
+    const fillForm = async () => {
+        if (!workbook || !docxTemplate) {
+            console.error("XLSX or DOCX is not loaded. what the hell did you do Czawlytko?");
+            return;
         }
 
-    }
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const sheetData = XLSX.utils.sheet_to_json(sheet);
+        let rowCounter = 1;
+
+        for (const rowData of sheetData) {
+            // Create a new JSZip instance
+            const zip = new JSZip();
+            // Load your DOCX template content into the zip instance
+            await zip.loadAsync(docxTemplate)
+                .then(function (zip) {
+                    const doc = new window.docxtemplater().loadZip(zip);
+                    doc.setData(rowData);
+                    doc.render();
+
+                    const out = doc.getZip().generate({
+                        type: "blob",
+                        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    });
+
+                    const downloader = document.createElement('button');
+                    downloader.innerText = `Download Row ${rowCounter}`;
+                    downloader.addEventListener('click', () => saveAs(out, `Report_${rowCounter++}.docx`));
+                    document.body.appendChild(downloader);
+                })
+                .catch(function (e) {
+                    console.error(e.message, e.stack);
+                });
+        }
+    };
+
 </script>
 
 </html>
