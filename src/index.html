@@ -19,9 +19,8 @@
         <label for="template">Template</label>
         <input type="file" accept=".docx" name="template" id="template">
         <br><br>
-        <button type="button" onclick="fillForm()" hidden id="genbutton">Generate DOCX</button>
+        <button type="button" onclick="fillForm()" id="genbutton" hidden>Generate DOCX</button>
     </form>
-    <!-- At bottom of page-->
     <div style="position: fixed; bottom: 0; width: 100%; text-align: center;">
         <p>Created by Josh Smith (A.K.A. <a href="https://github.com/purplelemons-dev">PurpleLemons</a>)</p>
     </div>
@@ -37,6 +36,15 @@
         if (dataInputLoaded && templateInputLoaded) {
             genButton.removeAttribute('hidden');
         }
+    }
+
+    const resetFileInput = () => {
+        dataInput.value = "";
+        templateInput.value = "";
+        genButton.setAttribute('hidden', true);
+        workbook = null;
+        docxTemplateBuffer = null;
+        [dataInputLoaded, templateInputLoaded] = [false, false];
     }
 
     const properMonth = (date) => {
@@ -87,16 +95,34 @@
         let rowCounter = 1;
 
         sheetData.forEach(data => {
+            console.log(data);
             let totalTaught = 0;
             Object.keys(data).forEach(key => {
                 if (key.startsWith("Num of Attendees")) {
                     totalTaught += Number(data[key]);
                 }
             });
-            console.log(data);
+
+            let rows = [];
+
+            Object.keys(data).forEach(key => {
+                if (key.startsWith("Num of ") || key.startsWith("Staff Assisted") || key.startsWith("Date") || key.startsWith("Location") || key.startsWith("Description")) {
+                    const [indexStr, ..._] = key.split(" ").reverse();
+                    const index = Number(indexStr) - 1;
+                    if (rows[index] === undefined) {
+                        rows[index] = {};
+                    }
+                    if (data[key] != "undefined") {
+                        const newKey = key.split(" ").slice(0, -1).join(" ");
+                        rows[index][newKey] = data[key];
+                    }
+                }
+            });
 
             const doc = new window.docxtemplater().loadZip(zip);
-            doc.setData({ ...data, "Total Taught": totalTaught, "Proper Month": properMonth(data["Date of Report"]) });
+            doc.setData({
+                ...data, "Total Taught": totalTaught, "Proper Month": properMonth(data["Date of Report"]), rows
+            });
             doc.render();
 
             const out = doc.getZip().generate({
@@ -106,7 +132,7 @@
 
             saveAs(out, `Report_${data["Event Name"]}_${rowCounter++}.docx`);
         });
-        window.location.reload();
+        resetFileInput();
     }
 </script>
 
