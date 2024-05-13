@@ -39,22 +39,40 @@
         }
     }
 
+    const properMonth = (date) => {
+        const [month, day, year] = date.split('/');
+        return {
+            "1": "January",
+            "2": "February",
+            "3": "March",
+            "4": "April",
+            "5": "May",
+            "6": "June",
+            "7": "July",
+            "8": "August",
+            "9": "September",
+            "10": "October",
+            "11": "November",
+            "12": "December",
+        }[month] + " " + year;
+    }
+
     dataInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         file.arrayBuffer().then(buffer => {
             workbook = XLSX.read(buffer, { type: 'array' });
+            dataInputLoaded = true;
+            tryRemoveHidden();
         });
-        dataInputLoaded = true;
-        tryRemoveHidden();
     });
 
     templateInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         file.arrayBuffer().then(buffer => {
             docxTemplateBuffer = buffer;
+            templateInputLoaded = true;
+            tryRemoveHidden();
         });
-        templateInputLoaded = true;
-        tryRemoveHidden();
     });
 
     const fillForm = async () => {
@@ -64,7 +82,7 @@
         }
 
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const sheetData = XLSX.utils.sheet_to_json(sheet);
+        const sheetData = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: "mm-dd-yyyy" });
         const zip = new PizZip(docxTemplateBuffer);
         let rowCounter = 1;
 
@@ -78,7 +96,7 @@
             console.log(data);
 
             const doc = new window.docxtemplater().loadZip(zip);
-            doc.setData({ ...data, "Total Taught": totalTaught });
+            doc.setData({ ...data, "Total Taught": totalTaught, "Proper Month": properMonth(data["Date of Report"]) });
             doc.render();
 
             const out = doc.getZip().generate({
