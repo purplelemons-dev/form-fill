@@ -16,7 +16,7 @@
         <label for="data">Excel file</label>
         <input type="file" accept=".xlsx, .xls" name="sheet" id="data">
         <br><br>
-        <input type="number" name="row" id="row" placeholder="Row number" min="1">
+        <input type="number" name="row" id="row" placeholder="Row number" width="16" min="1" required>
         <br><br>
         <button type="button" onclick="fillForm()" id="genbutton" hidden>Generate DOCX</button>
     </form>
@@ -44,15 +44,6 @@
         }
     }
 
-    const resetFileInput = () => {
-        dataInput.value = "";
-        genButton.setAttribute('hidden', true);
-        workbook = null;
-        docxTemplateBuffer = null;
-        [dataInputLoaded, templateInputLoaded] = [false, false];
-        rowNumber.value = "1";
-    }
-
     const properMonth = (date) => {
         const [month, day, year] = date.split('/');
         return {
@@ -76,6 +67,7 @@
         file.arrayBuffer().then(buffer => {
             workbook = XLSX.read(buffer, { type: 'array' });
             dataInputLoaded = true;
+            rowNumber.setAttribute('max', Number(workbook.Sheets[workbook.SheetNames[0]]["!ref"].split(":")[1].replace(/[A-Z]/g, "")) - 1);
             tryRemoveHidden();
         });
     });
@@ -89,6 +81,11 @@
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const sheetData = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: "mm-dd-yyyy" });
         const zip = new PizZip(docxTemplateBuffer);
+
+        if (sheetData.length < Number(rowNumber.value)) {
+            alert("Row number is out of bounds");
+            return;
+        }
 
         const data = sheetData[Number(rowNumber.value) - 1];
 
@@ -128,7 +125,6 @@
         });
 
         saveAs(out, `Report_${data["Event Name"]}.docx`.replace(" ", ""));
-        resetFileInput();
     }
 </script>
 
